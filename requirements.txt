@@ -1,9 +1,4 @@
 streamlit
-numpy
+numpy<2
 pillow
 opencv-python-headless==4.10.0.84
-tensorflow==2.21.0
-tf-keras
-keras
-keras-facenet
-deepface
