@@ -7,3 +7,4 @@ keras==2.15.0
 tf-keras==2.15.1
 keras-facenet==0.3.2
 deepface
+scipy==1.11.4
