@@ -42,6 +42,34 @@ uploaded_file = st.file_uploader(
 
 
 # ============================================================
+# CACHED FACENET MODEL
+# ============================================================
+
+@st.cache_resource
+def load_facenet():
+    from keras_facenet import FaceNet
+    return FaceNet()
+
+
+# ============================================================
+# CACHED DEEPFACE EMOTION MODEL
+# ============================================================
+
+@st.cache_resource
+def load_deepface():
+    from deepface import DeepFace
+
+    # Build the Emotion model once.
+    # DeepFace internally caches this model as well.
+    DeepFace.build_model(
+        "Emotion",
+        task="facial_attribute"
+    )
+
+    return DeepFace
+
+
+# ============================================================
 # PROCESS IMAGE
 # ============================================================
 
@@ -61,8 +89,19 @@ if uploaded_file is not None:
         width="stretch"
     )
 
+    # --------------------------------------------------------
     # Convert PIL image to OpenCV format
+    # --------------------------------------------------------
+
     image_rgb = np.array(image)
+
+    # Handle RGBA images safely
+    if image_rgb.shape[-1] == 4:
+
+        image_rgb = cv2.cvtColor(
+            image_rgb,
+            cv2.COLOR_RGBA2RGB
+        )
 
     image_cv = cv2.cvtColor(
         image_rgb,
@@ -155,13 +194,6 @@ if uploaded_file is not None:
     st.header("2️⃣ FaceNet Face Embeddings")
 
     try:
-
-        from keras_facenet import FaceNet
-
-        @st.cache_resource
-        def load_facenet():
-
-            return FaceNet()
 
         embedder = load_facenet()
 
@@ -263,6 +295,13 @@ if uploaded_file is not None:
             template_rgb = np.array(
                 template_pil
             )
+
+            if template_rgb.shape[-1] == 4:
+
+                template_rgb = cv2.cvtColor(
+                    template_rgb,
+                    cv2.COLOR_RGBA2RGB
+                )
 
             template_cv = cv2.cvtColor(
                 template_rgb,
@@ -369,7 +408,8 @@ if uploaded_file is not None:
 
     try:
 
-        from deepface import DeepFace
+        # Load the cached DeepFace + Emotion model
+        DeepFace = load_deepface()
 
         st.success(
             "DeepFace package loaded successfully."
@@ -420,7 +460,10 @@ if uploaded_file is not None:
                 list
             ):
 
-                analysis = analysis[0]
+                if len(analysis) > 0:
+                    analysis = analysis[0]
+                else:
+                    analysis = {}
 
             dominant_emotion = analysis.get(
                 "dominant_emotion",
