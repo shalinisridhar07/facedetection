@@ -2,6 +2,7 @@ streamlit
 numpy<2
 pillow
 opencv-python-headless==4.10.0.84
+scipy==1.11.4
 tensorflow==2.15.1
 keras==2.15.0
 keras-facenet==0.3.2
