@@ -144,8 +144,8 @@ if uploaded_file is not None:
         faces = face_cascade.detectMultiScale(
             gray_image,
             scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30)
+            minNeighbors=8,
+            minSize=(50, 50)
         )
 
         face_count = len(faces)
