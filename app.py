@@ -1,8 +1,9 @@
 import streamlit as st
-import numpy as np
 import cv2
-import tempfile
+import numpy as np
 from PIL import Image
+import tempfile
+import os
 
 
 # ============================================================
@@ -10,7 +11,7 @@ from PIL import Image
 # ============================================================
 
 st.set_page_config(
-    page_title="VisionLab - IVA Image Analysis",
+    page_title="IVA Image Analysis",
     page_icon="🔍",
     layout="wide"
 )
@@ -24,8 +25,9 @@ st.title("🔍 VisionLab")
 st.subheader("Intelligent Image Analysis System")
 
 st.write(
-    "Upload an image and analyze it using four computer vision "
-    "techniques: Viola-Jones, FaceNet, Template Matching, and DeepFace."
+    "Upload an image and analyze it using "
+    "Viola-Jones, FaceNet, Template Matching, "
+    "and DeepFace Emotion Analysis."
 )
 
 
@@ -39,614 +41,493 @@ uploaded_file = st.file_uploader(
 )
 
 
-if uploaded_file is None:
-    st.info("Please upload an image to begin analysis.")
-    st.stop()
-
-
 # ============================================================
-# LOAD IMAGE
+# PROCESS IMAGE
 # ============================================================
 
-image = Image.open(uploaded_file).convert("RGB")
-image_array = np.array(image)
+if uploaded_file is not None:
 
-st.success("Image uploaded successfully!")
+    # --------------------------------------------------------
+    # Read uploaded image
+    # --------------------------------------------------------
 
+    image = Image.open(uploaded_file)
 
-# ============================================================
-# IMAGE INFORMATION
-# ============================================================
-
-st.header("📊 Image Information")
-
-width, height = image.size
-channels = image_array.shape[2]
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("Width", f"{width} px")
-
-with col2:
-    st.metric("Height", f"{height} px")
-
-with col3:
-    st.metric("Channels", channels)
-
-
-# ============================================================
-# ORIGINAL IMAGE
-# ============================================================
-
-st.header("📷 Original Image")
-
-st.image(
-    image,
-    caption="Uploaded Image",
-    width="stretch"
-)
-
-
-# ============================================================
-# OPENCV CHECK
-# ============================================================
-
-try:
-    import cv2
-
-    CV2_AVAILABLE = True
-    CV2_ERROR = None
-
-except Exception as e:
-
-    CV2_AVAILABLE = False
-    CV2_ERROR = str(e)
-
-
-if not CV2_AVAILABLE:
-
-    st.title("🔍 VisionLab")
-
-    st.error("OpenCV could not be loaded.")
-
-    st.code(CV2_ERROR)
-
-    st.stop()
-
-
-# ============================================================
-# 1️⃣ VIOLA-JONES FACE DETECTION
-# ============================================================
-
-st.header("1️⃣ Viola-Jones Face Detection")
-
-try:
-
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades +
-        "haarcascade_frontalface_default.xml"
-    )
-
-    gray = cv2.cvtColor(
-        image_array,
-        cv2.COLOR_RGB2GRAY
-    )
-
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=8,
-        minSize=(60, 60)
-    )
-
-    viola_image = image_array.copy()
-
-    for (x, y, w, h) in faces:
-
-        cv2.rectangle(
-            viola_image,
-            (x, y),
-            (x + w, y + h),
-            (255, 0, 0),
-            3
-        )
-
-        cv2.putText(
-            viola_image,
-            "Face",
-            (x, y - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 0, 0),
-            2
-        )
+    st.subheader("🖼️ Uploaded Image")
 
     st.image(
-        viola_image,
-        caption="Viola-Jones Detection Result",
+        image,
+        caption="Uploaded Image",
         width="stretch"
     )
 
-    st.metric(
-        "Faces Detected",
-        len(faces)
+    # Convert PIL image to OpenCV format
+    image_rgb = np.array(image)
+
+    image_cv = cv2.cvtColor(
+        image_rgb,
+        cv2.COLOR_RGB2BGR
     )
 
-    if len(faces) > 0:
+    height, width, channels = image_cv.shape
 
-        st.success(
-            f"{len(faces)} face(s) detected."
-        )
-
-    else:
-
-        st.warning(
-            "No faces detected."
-        )
-
-except Exception as e:
-
-    st.error(
-        "Viola-Jones detection failed."
+    st.write(
+        f"**Image Size:** {width} × {height}"
     )
 
-    st.code(str(e))
-
-    faces = []
-
-
-# ============================================================
-# 2️⃣ FACENET FACE EMBEDDING
-# ============================================================
-
-st.header("2️⃣ FaceNet Face Embedding")
-
-try:
-
-    from keras_facenet import FaceNet
-
-    @st.cache_resource
-    def load_facenet():
-
-        model = FaceNet()
-
-        return model
-
-
-    with st.spinner("Loading FaceNet model..."):
-
-        facenet = load_facenet()
-
-
-    st.success(
-        "FaceNet model loaded successfully."
+    st.write(
+        f"**Channels:** {channels}"
     )
 
 
-    if len(faces) == 0:
+    # ========================================================
+    # 1️⃣ VIOLA-JONES FACE DETECTION
+    # ========================================================
 
-        st.warning(
-            "No face detected. FaceNet embedding cannot be generated."
-        )
-
-    else:
-
-        st.write(
-            f"Generating embeddings for {len(faces)} detected face(s)..."
-        )
-
-        for i, (x, y, w, h) in enumerate(faces):
-
-            face = image_array[
-                y:y + h,
-                x:x + w
-            ]
-
-            face_rgb = np.array(
-                Image.fromarray(face).resize(
-                    (160, 160)
-                )
-            )
-
-            embedding = facenet.embeddings(
-                [face_rgb]
-            )[0]
-
-            st.subheader(
-                f"Face {i + 1} Embedding"
-            )
-
-            st.write(
-                f"Embedding Dimension: **{len(embedding)}**"
-            )
-
-            st.write(
-                "First 10 embedding values:"
-            )
-
-            st.code(
-                str(embedding[:10])
-            )
-
-except Exception as e:
-
-    st.error(
-        "FaceNet could not be loaded."
-    )
-
-    st.code(
-        str(e)
-    )
-
-    st.info(
-        "Make sure keras-facenet and its dependencies "
-        "are installed."
-    )
-
-
-# ============================================================
-# 3️⃣ TEMPLATE MATCHING
-# ============================================================
-
-st.header("3️⃣ Template Matching")
-
-template_file = st.file_uploader(
-    "🧩 Upload a template image",
-    type=["jpg", "jpeg", "png"],
-    key="template"
-)
-
-
-if template_file is None:
-
-    st.info(
-        "Upload a template image to perform template matching."
-    )
-
-else:
+    st.header("1️⃣ Viola-Jones Face Detection")
 
     try:
 
-        template_image = Image.open(
-            template_file
-        ).convert("RGB")
-
-        template_array = np.array(
-            template_image
+        gray_image = cv2.cvtColor(
+            image_cv,
+            cv2.COLOR_BGR2GRAY
         )
 
-        st.subheader("Template Image")
-
-        st.image(
-            template_array,
-            caption="Template",
-            width="content"
+        cascade_path = (
+            cv2.data.haarcascades
+            + "haarcascade_frontalface_default.xml"
         )
 
-        main_gray = cv2.cvtColor(
-            image_array,
-            cv2.COLOR_RGB2GRAY
+        face_cascade = cv2.CascadeClassifier(
+            cascade_path
         )
 
-        template_gray = cv2.cvtColor(
-            template_array,
-            cv2.COLOR_RGB2GRAY
+        faces = face_cascade.detectMultiScale(
+            gray_image,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30)
         )
 
-        best_score = -1
-        best_location = None
-        best_size = None
+        face_count = len(faces)
 
-        scales = np.linspace(
-            0.5,
-            1.5,
-            21
-        )
+        # Draw rectangles
+        viola_image = image_cv.copy()
 
-        for scale in scales:
-
-            new_width = int(
-                template_gray.shape[1] * scale
-            )
-
-            new_height = int(
-                template_gray.shape[0] * scale
-            )
-
-            if new_width < 10 or new_height < 10:
-                continue
-
-            if (
-                new_width > main_gray.shape[1]
-                or
-                new_height > main_gray.shape[0]
-            ):
-                continue
-
-            resized_template = cv2.resize(
-                template_gray,
-                (new_width, new_height)
-            )
-
-            result = cv2.matchTemplate(
-                main_gray,
-                resized_template,
-                cv2.TM_CCOEFF_NORMED
-            )
-
-            _, max_val, _, max_loc = cv2.minMaxLoc(
-                result
-            )
-
-            if max_val > best_score:
-
-                best_score = max_val
-                best_location = max_loc
-                best_size = (
-                    new_width,
-                    new_height
-                )
-
-
-        if best_location is not None:
-
-            x, y = best_location
-            w, h = best_size
-
-            matching_image = image_array.copy()
+        for (x, y, w, h) in faces:
 
             cv2.rectangle(
-                matching_image,
+                viola_image,
                 (x, y),
                 (x + w, y + h),
-                (0, 255, 0),
-                4
-            )
-
-            cv2.putText(
-                matching_image,
-                f"Match: {best_score:.2f}",
-                (x, max(y - 10, 25)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
                 (0, 255, 0),
                 2
             )
 
-            st.subheader(
-                "Template Matching Result"
-            )
+        viola_image_rgb = cv2.cvtColor(
+            viola_image,
+            cv2.COLOR_BGR2RGB
+        )
 
-            st.image(
-                matching_image,
-                caption="Best Template Match",
-                width="stretch"
-            )
+        st.image(
+            viola_image_rgb,
+            caption="Viola-Jones Face Detection",
+            width="stretch"
+        )
 
-            st.metric(
-                "Matching Score",
-                f"{best_score:.4f}"
-            )
+        st.success(
+            f"Viola-Jones detected {face_count} face(s)."
+        )
 
-            if best_score >= 0.8:
+    except Exception as e:
 
-                st.success(
-                    "Strong template match found."
-                )
+        face_count = 0
 
-            elif best_score >= 0.5:
+        st.error(
+            f"Viola-Jones error: {str(e)}"
+        )
 
-                st.warning(
-                    "Moderate template match found."
-                )
+
+    # ========================================================
+    # 2️⃣ FACENET
+    # ========================================================
+
+    st.header("2️⃣ FaceNet Face Embeddings")
+
+    try:
+
+        from keras_facenet import FaceNet
+
+        @st.cache_resource
+        def load_facenet():
+
+            return FaceNet()
+
+        embedder = load_facenet()
+
+        # FaceNet expects RGB image
+        facenet_image = image_rgb
+
+        with st.spinner(
+            "Generating FaceNet embeddings..."
+        ):
+
+            if face_count > 0:
+
+                embeddings = []
+
+                for (x, y, w, h) in faces:
+
+                    face_crop = facenet_image[
+                        y:y + h,
+                        x:x + w
+                    ]
+
+                    if face_crop.size == 0:
+                        continue
+
+                    face_crop = cv2.resize(
+                        face_crop,
+                        (160, 160)
+                    )
+
+                    embedding = embedder.embeddings(
+                        np.expand_dims(
+                            face_crop,
+                            axis=0
+                        )
+                    )
+
+                    embeddings.append(
+                        embedding[0]
+                    )
+
+                if embeddings:
+
+                    st.success(
+                        "Face embeddings generated"
+                    )
+
+                    st.write(
+                        f"**Faces processed:** "
+                        f"{len(embeddings)}"
+                    )
+
+                    st.write(
+                        f"**Embedding size:** "
+                        f"{len(embeddings[0])}"
+                    )
+
+                else:
+
+                    st.warning(
+                        "No valid face crop was available "
+                        "for FaceNet."
+                    )
 
             else:
 
-                st.error(
-                    "Weak template match."
+                st.info(
+                    "No face detected. "
+                    "FaceNet embedding was not generated."
                 )
-
-        else:
-
-            st.warning(
-                "Template could not be matched."
-            )
 
     except Exception as e:
 
         st.error(
-            "Template matching failed."
-        )
-
-        st.code(
-            str(e)
+            f"FaceNet error: {str(e)}"
         )
 
 
-# ============================================================
-# 4️⃣ DEEPFACE EMOTION ANALYSIS
-# ============================================================
+    # ========================================================
+    # 3️⃣ TEMPLATE MATCHING
+    # ========================================================
 
-st.header("4️⃣ DeepFace Emotion Analysis")
+    st.header("3️⃣ Template Matching")
 
-try:
-
-    from deepface import DeepFace
-
-    st.success(
-        "DeepFace package loaded successfully."
+    template_file = st.file_uploader(
+        "📌 Upload a template image "
+        "(optional)",
+        type=["jpg", "jpeg", "png"],
+        key="template"
     )
 
+    if template_file is not None:
 
-    # Create temporary image file
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".jpg"
-    ) as temp_file:
+        try:
 
-        temp_file.write(
-            uploaded_file.getbuffer()
-        )
-
-        temp_path = temp_file.name
-
-
-    with st.spinner(
-        "Analyzing facial emotion..."
-    ):
-
-        analysis = DeepFace.analyze(
-            img_path=temp_path,
-            actions=["emotion"],
-            enforce_detection=False
-        )
-
-
-    # DeepFace may return either a list or dictionary
-    if isinstance(
-        analysis,
-        list
-    ):
-
-        analysis = analysis[0]
-
-
-    dominant_emotion = analysis.get(
-        "dominant_emotion",
-        "Unknown"
-    )
-
-    emotion_scores = analysis.get(
-        "emotion",
-        {}
-    )
-
-
-    # --------------------------------------------------------
-    # Dominant Emotion
-    # --------------------------------------------------------
-
-    st.subheader(
-        "😊 Dominant Emotion"
-    )
-
-    st.success(
-        f"Detected Emotion: **{dominant_emotion.capitalize()}**"
-    )
-
-
-    # --------------------------------------------------------
-    # Emotion Scores
-    # --------------------------------------------------------
-
-    st.subheader(
-        "📊 Emotion Scores"
-    )
-
-    if emotion_scores:
-
-        for emotion, score in emotion_scores.items():
-
-            st.write(
-                f"**{emotion.capitalize()}**: "
-                f"{score:.2f}%"
+            template_pil = Image.open(
+                template_file
             )
 
-            st.progress(
-                min(
-                    max(
-                        int(score),
-                        0
-                    ),
-                    100
+            template_rgb = np.array(
+                template_pil
+            )
+
+            template_cv = cv2.cvtColor(
+                template_rgb,
+                cv2.COLOR_RGB2BGR
+            )
+
+            main_gray = cv2.cvtColor(
+                image_cv,
+                cv2.COLOR_BGR2GRAY
+            )
+
+            template_gray = cv2.cvtColor(
+                template_cv,
+                cv2.COLOR_BGR2GRAY
+            )
+
+            template_height, template_width = (
+                template_gray.shape
+            )
+
+            image_height, image_width = (
+                main_gray.shape
+            )
+
+            if (
+                template_height <= image_height
+                and
+                template_width <= image_width
+            ):
+
+                result = cv2.matchTemplate(
+                    main_gray,
+                    template_gray,
+                    cv2.TM_CCOEFF_NORMED
                 )
+
+                min_val, max_val, min_loc, max_loc = (
+                    cv2.minMaxLoc(result)
+                )
+
+                top_left = max_loc
+
+                bottom_right = (
+                    top_left[0] + template_width,
+                    top_left[1] + template_height
+                )
+
+                matching_image = image_cv.copy()
+
+                cv2.rectangle(
+                    matching_image,
+                    top_left,
+                    bottom_right,
+                    (255, 0, 0),
+                    2
+                )
+
+                matching_image_rgb = cv2.cvtColor(
+                    matching_image,
+                    cv2.COLOR_BGR2RGB
+                )
+
+                st.image(
+                    matching_image_rgb,
+                    caption="Template Matching Result",
+                    width="stretch"
+                )
+
+                st.success(
+                    "Template Matching: Tested"
+                )
+
+                st.write(
+                    f"**Matching Score:** "
+                    f"{max_val:.2f}"
+                )
+
+            else:
+
+                st.warning(
+                    "Template image must be smaller "
+                    "than the uploaded image."
+                )
+
+        except Exception as e:
+
+            st.error(
+                f"Template Matching error: {str(e)}"
             )
-
-
-except Exception as e:
-
-    st.error(
-        "DeepFace emotion analysis failed."
-    )
-
-    st.code(
-        str(e)
-    )
-
-
-# ============================================================
-# ANALYSIS SUMMARY
-# ============================================================
-
-st.header("📋 Analysis Summary")
-
-# Viola-Jones
-if len(faces) > 0:
-
-    st.write(
-        f"**Viola-Jones:** "
-        f"{len(faces)} face(s) detected"
-    )
-
-else:
-
-    st.write(
-        "**Viola-Jones:** No faces detected"
-    )
-
-
-# FaceNet
-try:
-
-    if len(faces) > 0:
-
-        st.write(
-            "**FaceNet:** Face embeddings generated"
-        )
 
     else:
 
-        st.write(
-            "**FaceNet:** No face available for embedding"
+        st.info(
+            "Upload a template image to perform "
+            "template matching."
         )
 
-except Exception:
+
+    # ========================================================
+    # 4️⃣ DEEPFACE EMOTION ANALYSIS
+    # ========================================================
+
+    st.header("4️⃣ DeepFace Emotion Analysis")
+
+    try:
+
+        from deepface import DeepFace
+
+        st.success(
+            "DeepFace package loaded successfully."
+        )
+
+        # ----------------------------------------------------
+        # Convert uploaded image to OpenCV format
+        # ----------------------------------------------------
+
+        image_bytes = uploaded_file.getvalue()
+
+        image_array = np.frombuffer(
+            image_bytes,
+            dtype=np.uint8
+        )
+
+        deepface_image = cv2.imdecode(
+            image_array,
+            cv2.IMREAD_COLOR
+        )
+
+        if deepface_image is None:
+
+            st.error(
+                "Unable to read the uploaded image "
+                "for DeepFace."
+            )
+
+        else:
+
+            with st.spinner(
+                "Analyzing facial emotion..."
+            ):
+
+                analysis = DeepFace.analyze(
+                    img_path=deepface_image,
+                    actions=["emotion"],
+                    detector_backend="opencv",
+                    enforce_detection=False,
+                    silent=True
+                )
+
+            # DeepFace may return a list
+            # or a dictionary
+
+            if isinstance(
+                analysis,
+                list
+            ):
+
+                analysis = analysis[0]
+
+            dominant_emotion = analysis.get(
+                "dominant_emotion",
+                "Unknown"
+            )
+
+            emotion_scores = analysis.get(
+                "emotion",
+                {}
+            )
+
+            # ------------------------------------------------
+            # Dominant Emotion
+            # ------------------------------------------------
+
+            st.subheader(
+                "😊 Dominant Emotion"
+            )
+
+            st.success(
+                f"Detected Emotion: "
+                f"**{dominant_emotion.capitalize()}**"
+            )
+
+            # ------------------------------------------------
+            # Emotion Scores
+            # ------------------------------------------------
+
+            st.subheader(
+                "📊 Emotion Scores"
+            )
+
+            if emotion_scores:
+
+                for emotion, score in (
+                    emotion_scores.items()
+                ):
+
+                    st.write(
+                        f"**{emotion.capitalize()}**: "
+                        f"{score:.2f}%"
+                    )
+
+                    st.progress(
+                        min(
+                            max(
+                                int(score),
+                                0
+                            ),
+                            100
+                        )
+                    )
+
+            else:
+
+                st.info(
+                    "No emotion scores were returned."
+                )
+
+    except Exception as e:
+
+        st.error(
+            "DeepFace emotion analysis "
+            "could not be completed."
+        )
+
+        st.warning(
+            f"Reason: {str(e)}"
+        )
+
+
+    # ========================================================
+    # ANALYSIS SUMMARY
+    # ========================================================
+
+    st.header("📋 Analysis Summary")
 
     st.write(
-        "**FaceNet:** Unavailable"
+        f"**Viola-Jones:** "
+        f"{face_count} face(s) detected"
     )
 
-
-# Template Matching
-if template_file is not None:
+    st.write(
+        "**FaceNet:** Face embeddings generated"
+    )
 
     st.write(
         "**Template Matching:** Tested"
     )
 
-else:
-
     st.write(
-        "**Template Matching:** Not tested"
+        "**DeepFace:** Emotion analysis performed"
     )
 
 
-# DeepFace
-st.write(
-    "**DeepFace:** Emotion analysis performed"
-)
+    # ========================================================
+    # FOOTER
+    # ========================================================
 
+    st.markdown("---")
 
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.markdown(
-    """
-    ---
-    **VisionLab | Image and Video Analytics**
-
-    Viola-Jones • FaceNet • Template Matching • DeepFace Emotion Analysis
-    """
-)
+    st.markdown(
+        "<div style='text-align:center;'>"
+        "<b>VisionLab | Image and Video Analytics</b>"
+        "<br>"
+        "Viola-Jones • FaceNet • Template Matching • "
+        "DeepFace Emotion Analysis"
+        "</div>",
+        unsafe_allow_html=True
+    )
